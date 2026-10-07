@@ -1,0 +1,5 @@
+services:
+  shop-monolith:
+    build: .
+    ports:
+      - "8081:5000"

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShopMini</title>
+<style>
+body { font-family: Arial, sans-serif; max-width: 900px; margin: 24px auto; padding: 0 16px; background: #F4F8FB; color: #1A2733; }
+h1 { color: #065A82; margin-bottom: 4px; }
+.sub { color: #1C7293; margin-top: 0; }
+.status { display: flex; gap: 12px; margin: 16px 0; }
+.badge { flex: 1; padding: 12px; border-radius: 8px; font-weight: bold; color: #fff; }
+.up { background: #21B0A4; } .down { background: #E76F51; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+button { background: #065A82; color: #fff; border: 0; padding: 8px 14px; border-radius: 6px; cursor: pointer; }
+button.danger { background: #E76F51; }
+li { margin: 6px 0; } small { color: #666; }
+</style>
+</head>
+<body>
+<h1>ShopMini</h1>
+<p class="sub">Kiến trúc: <b id="arch">...</b></p>
+<div class="status">
+<div id="st-product" class="badge down">Product Service: đang kiểm tra...</div>
+<div id="st-order" class="badge down">Order Service: đang kiểm tra...</div>
+</div>
+<div class="grid">
+<div class="card">
+<h3>Sản phẩm</h3>
+<ul id="products"><li>Đang tải...</li></ul>
+<small id="served"></small>
+</div>
+<div class="card">
+<h3>Đặt hàng</h3>
+<select id="pid"><option value="1">Áo thun ULSA</option><option value="2">Balo laptop</option><option value="3">Bình nước giữ nhiệt</option></select>
+<input id="qty" type="number" value="1" min="1" style="width:60px">
+<button onclick="order()">Đặt hàng</button>
+<p id="msg"></p>
+<h4>Đơn hàng đã đặt</h4>
+<ul id="orders"></ul>
+<button class="danger" onclick="crash()">Giả lập sự cố Order Service</button>
+</div>
+</div>
+<script>
+async function getJSON(url, opt) {
+  const r = await fetch(url, opt);
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+function setBadge(id, ok, label) {
+  const el = document.getElementById(id);
+  el.className = 'badge ' + (ok ? 'up' : 'down');
+  el.textContent = label + (ok ? ': ĐANG CHẠY' : ': NGỪNG HOẠT ĐỘNG X');
+}
+async function refresh() {
+  try {
+    const d = await getJSON('/api/products');
+    document.getElementById('arch').textContent = d.architecture || 'Microservices';
+    document.getElementById('products').innerHTML = d.products.map(p => `<li>${p.name} - ${p.price.toLocaleString('vi-VN')} đ</li>`).join('');
+    document.getElementById('served').textContent = `Phục vụ bởi: ${d.served_by} | ${d.language} | phiên bản ${d.version}`;
+    setBadge('st-product', true, 'Product Service');
+  } catch (e) {
+    document.getElementById('products').innerHTML = '<li>Không tải được sản phẩm</li>';
+    setBadge('st-product', false, 'Product Service');
+  }
+  try {
+    const d = await getJSON('/api/orders');
+    document.getElementById('orders').innerHTML = d.orders.map(o => `<li>#${o.id} ${o.product} x${o.qty} - ${o.total.toLocaleString('vi-VN')} đ</li>`).join('') || '<li>Chưa có đơn</li>';
+    setBadge('st-order', true, 'Order Service');
+  } catch (e) {
+    setBadge('st-order', false, 'Order Service');
+  }
+}
+async function order() {
+  const body = { product_id: document.getElementById('pid').value, qty: document.getElementById('qty').value };
+  try {
+    const d = await getJSON('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    document.getElementById('msg').textContent = `Đã tạo đơn #${d.order.id}, tổng ${d.order.total.toLocaleString('vi-VN')} đ`;
+  } catch (e) {
+    document.getElementById('msg').textContent = 'X Không đặt được hàng (lỗi ' + e.message + ')';
+  }
+  refresh();
+}
+async function crash() {
+  try { await fetch('/api/orders/crash', { method: 'POST' }); } catch (e) {}
+  setTimeout(refresh, 1500);
+}
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
